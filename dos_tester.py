@@ -1,9 +1,9 @@
 import sys
 import time
-from scapy.all import Ehter, IP, TCP, sendp
+from scapy.all import Ether, IP, TCP, sendp
 
 TARGET_IP = "192.168.18.135" # replace with your target IP
-INTERFACE = "Eth0"	# replace with your network interface
+INTERFACE = "eth0"	# replace with your network interface
 NUM_PACKETS = 100
 DURATION = 5
 
