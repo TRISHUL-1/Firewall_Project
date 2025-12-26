@@ -58,7 +58,7 @@ def packet_callback(packet):
 			if packet_rate > THRESHOLD and ip not in blacklist_ips:
 				print(f"Blocking ip: {src_ip}, packet_rate: {packet_rate}")
 				os.system(f"iptables -A INPUT -s {src_ip} -j DROP")
-				log(f"Blocking source ip: {src_ip}, packet_rate: {packet_rate}")
+				log_event(f"Blocking source ip: {src_ip}, packet_rate: {packet_rate}")
 				blacklist_ips.add()
 		packet_count.clear()
 		start_time[0] = current_time
