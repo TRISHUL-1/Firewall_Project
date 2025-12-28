@@ -64,6 +64,12 @@ def packet_callback(packet):
 		for ip, count in packet_count.items():
 			packet_rate = count / time_interval
 			if packet_rate > THRESHOLD and ip not in blacklist_ips:
+				
+				send_email(GMAIL_SERVICE, 
+							user_alert_info["to"],
+							user_alert_info["subject"], 
+							user_alert_info["message_text"])
+				
 				print(f"Blocking ip: {src_ip}, packet_rate: {packet_rate}")
 				os.system(f"iptables -A INPUT -s {src_ip} -j DROP")
 				log_event(f"Blocking source ip: {src_ip}, packet_rate: {packet_rate}")
