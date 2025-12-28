@@ -1,0 +1,8 @@
+#ignores the entire virtual enviornment
+my_venv/
+
+#ignore all the .json files
+*.json
+
+#ignores the pycache folder
+__pycache__/

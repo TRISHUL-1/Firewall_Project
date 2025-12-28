@@ -3,8 +3,10 @@ import time
 import sys
 from collections import defaultdict
 from scapy.all import sniff,IP,TCP
+from send_mail import *  #gmail_authenticate, send_email, get_information,
 
 THRESHOLD = 40
+GMAIL_SERVICE = gmail_authenticate()
 print(f"Threshold: {THRESHOLD}")
 
 def read_ip_file(filename):
@@ -16,7 +18,7 @@ def read_ip_file(filename):
 def log_event(message):
 	""" It takes a message as an argument and then creates an log file inside the log folder """
 	log_folder = "logs"
-	os.mkdirs(log_folders, exist_ok=True)
+	os.mkdirs(log_folder, exist_ok=True)
 	time_stamp = time.strftime("%Y-%m-%D_%H-%M-%S",time.localtime())
 	log_file = os.path.join(log_folder, f"log_{time_stamp}.txt")
 
@@ -46,6 +48,12 @@ def packet_callback(packet):
 		print(f"Blocking nimda worm: {src_ip}")
 		os.system(f"iptables -A INPUT -s {src_ip} -j DROP")
 		log_event(f"Blocking Nimda source ip: {src_ip}")
+
+		send_email(GMAIL_SERVICE, 
+			user_alert_info["to"],
+			user_alert_info["subject"], 
+			user_alert_info["message_text"])
+
 		return
 
 	packet_count[src_ip] += 1
@@ -73,6 +81,7 @@ if __name__ == "__main__":
 	blacklist_ips = read_ip_file("blacklist.txt")
 
 	packet_count = defaultdict(int)
+	user_alert_info = get_information()
 	start_time = [time.time()]
 
 	print("Monitoring Network Traffic...")
