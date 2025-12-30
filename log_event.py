@@ -28,14 +28,3 @@ def log_event(packet_info, action, message):
 
     with open(log_file, "a") as file:
         file.write(json.dumps(log_dict) + "\n")
-
-
-# def log_event(message):
-# 	""" It takes a message as an argument and then creates an log file inside the log folder """
-# 	log_folder = "logs"
-# 	os.mkdirs(log_folder, exist_ok=True)
-# 	time_stamp = time.strftime("%Y-%m-%D_%H-%M-%S",time.localtime())
-# 	log_file = os.path.join(log_folder, f"log_{time_stamp}.txt")
-
-# 	with open(log_file, "a") as file:
-# 		file.write(f"{message}\n")
