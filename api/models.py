@@ -10,10 +10,10 @@ class Firewall_log(Base):
 
     id = Column(Integer, primary_key=True)
     timestamp = Column(TIMESTAMP)
-    src_ip = Column(INET)
-    dst_ip = Column(INET)
+    src_ip = Column(INET, index=True)
+    dst_ip = Column(INET, index=True)
     src_port = Column(Integer)
     dst_port = Column(Integer)
     protocol = Column(String)
-    action = Column(String)
+    action = Column(String, index=True)
     reason = Column(Text)
