@@ -1,0 +1,10 @@
+{"timestamp":"2025-01-03 10:15:01","src_ip":"192.168.1.25","dst_ip":"10.0.0.5","src_port":52341,"dst_port":22,"protocol":"TCP","action":"BLOCK","reason":"SSH brute-force attempt detected"}
+{"timestamp":"2025-01-03 10:15:03","src_ip":"203.0.113.45","dst_ip":"10.0.0.5","src_port":49812,"dst_port":80,"protocol":"TCP","action":"ALLOW","reason":"Normal HTTP request"}
+{"timestamp":"2025-01-03 10:15:05","src_ip":"198.51.100.77","dst_ip":"10.0.0.5","src_port":33445,"dst_port":80,"protocol":"TCP","action":"BLOCK","reason":"Nimda worm signature detected"}
+{"timestamp":"2025-01-03 10:15:08","src_ip":"192.0.2.91","dst_ip":"10.0.0.5","src_port":60123,"dst_port":443,"protocol":"TCP","action":"ALLOW","reason":"Legitimate HTTPS traffic"}
+{"timestamp":"2025-01-03 10:15:12","src_ip":"45.33.32.156","dst_ip":"10.0.0.5","src_port":41234,"dst_port":80,"protocol":"TCP","action":"BLOCK","reason":"High packet rate detected (DDoS behavior)"}
+{"timestamp":"2025-01-03 10:15:15","src_ip":"10.1.1.12","dst_ip":"10.0.0.5","src_port":34567,"dst_port":53,"protocol":"UDP","action":"ALLOW","reason":"Internal DNS query"}
+{"timestamp":"2025-01-03 10:15:18","src_ip":"8.8.8.8","dst_ip":"10.0.0.5","src_port":53,"dst_port":53112,"protocol":"UDP","action":"ALLOW","reason":"DNS response"}
+{"timestamp":"2025-01-03 10:15:21","src_ip":"185.199.108.153","dst_ip":"10.0.0.5","src_port":49211,"dst_port":22,"protocol":"TCP","action":"BLOCK","reason":"Multiple failed SSH attempts"}
+{"timestamp":"2025-01-03 10:15:25","src_ip":"172.16.0.45","dst_ip":"10.0.0.5","src_port":40001,"dst_port":3389,"protocol":"TCP","action":"BLOCK","reason":"Unauthorized RDP access attempt"}
+{"timestamp":"2025-01-03 10:15:29","src_ip":"203.0.113.88","dst_ip":"10.0.0.5","src_port":58921,"dst_port":8080,"protocol":"TCP","action":"ALLOW","reason":"Web application traffic"}

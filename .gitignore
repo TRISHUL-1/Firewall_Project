@@ -6,3 +6,9 @@ my_venv/
 
 #ignores the pycache folder
 __pycache__/
+
+#ignores credentials folder
+credentials/
+
+#ignores the .env file
+.env

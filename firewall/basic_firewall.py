@@ -3,9 +3,9 @@ import time
 import sys
 from collections import defaultdict
 from scapy.all import sniff,IP,TCP
-from send_mail import *
-from log_event import *
-from packet_info import *
+from Firewall_Project.firewall.send_mail import *
+from Firewall_Project.firewall.log_event import *
+from Firewall_Project.firewall.packet_info import *
 
 
 THRESHOLD = 40
