@@ -3,9 +3,10 @@ import time
 import sys
 from collections import defaultdict
 from scapy.all import sniff,IP,TCP
-from Firewall_Project.firewall.send_mail import *
-from Firewall_Project.firewall.log_event import *
-from Firewall_Project.firewall.packet_info import *
+from send_mail import *
+from log_event import *
+from packet_info import *
+from firewall.blocked_ip import block_ip
 
 
 THRESHOLD = 40
@@ -43,6 +44,7 @@ def packet_callback(packet):
 		print(f"Blocking nimda worm: {packet_info["src_ip"]}")
 		os.system(f"iptables -A INPUT -s {packet_info["src_ip"]} -j DROP")
 		log_event(packet_info=packet_info, action="BLOCK" ,message=f"Blocking Nimda source ip: {packet_info["src_ip"]}")
+		block_ip(ip=packet_info["src_ip"], reason="Nimda Worm Detected")
 
 		send_email(GMAIL_SERVICE, 
 			user_alert_info["to"],
@@ -68,6 +70,7 @@ def packet_callback(packet):
 				print(f"Blocking ip: {packet_info["src_ip"]}, packet_rate: {packet_rate}")
 				os.system(f"iptables -A INPUT -s {packet_info["src_ip"]} -j DROP")
 				log_event(packet_info=packet_info, action="BLOCK", message=f"Blocking source ip: {packet_info["src_ip"]}, packet_rate: {packet_rate}")
+				block_ip(ip=packet_info["src_ip"], reason="High Packet Rate Detected")
 				blacklist_ips.add(ip)
 		packet_count.clear()
 		start_time[0] = current_time
