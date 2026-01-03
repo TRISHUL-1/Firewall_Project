@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from api.database import sessionLocal, engine
 from api import models
-from api.models import Firewall_log
+from api.models import Firewall_log, BlockedIP
 from sqlalchemy import func
 
 app = FastAPI(title="Firewall Dashboard API")
@@ -50,3 +50,13 @@ def get_stats():
             {"port": port, "count": count} for port, count in top_ports
         ]
     }
+
+
+@app.get("/blocked_ips")
+def get_blocked_ips():
+    db = sessionLocal()
+
+    blocked = db.query(BlockedIP).order_by(BlockedIP.blocked_at.desc()).all()
+    db.close()
+
+    return blocked
