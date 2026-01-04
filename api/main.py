@@ -3,6 +3,7 @@ from api.database import sessionLocal, engine
 from api import models
 from api.models import Firewall_log, BlockedIP
 from sqlalchemy import func
+from firewall.block_manager import block_ip, unblock_ip
 
 app = FastAPI(title="Firewall Dashboard API")
 
@@ -60,3 +61,24 @@ def get_blocked_ips():
     db.close()
 
     return blocked
+
+@app.post("/block/{ip}")
+def api_block_ip(ip: str, reason: str = "Blocked by Admin"):
+    block_ip(ip= ip, reason= reason)
+
+    return {
+        "status" : "success",
+        "ip" : ip,
+        "action" : "blocked",
+        "reason" : reason
+    }
+
+@app.delete("unblock/{ip}")
+def api_unblock_ip(ip: str):
+    unblock_ip(ip= ip)
+
+    return {
+        "status" : "success",
+        "ip" : ip,
+        "action" : "unblocked",
+    }
