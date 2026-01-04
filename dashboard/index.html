@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Firewall Dashboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #0f172a;
+      color: #e5e7eb;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 { color: #38bdf8; }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      background: #020617;
+      padding: 15px;
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      background: #020617;
+    }
+
+    th, td {
+      padding: 8px;
+      border-bottom: 1px solid #1e293b;
+      text-align: center;
+    }
+
+    th {
+      background: #020617;
+      color: #38bdf8;
+    }
+
+    .block { color: #ef4444; font-weight: bold; }
+    .allow { color: #22c55e; }
+
+    button {
+      background: #ef4444;
+      border: none;
+      color: white;
+      padding: 5px 10px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    button.unblock {
+      background: #22c55e;
+    }
+  </style>
+</head>
+<body>
+
+<h1>🔥 Firewall Dashboard</h1>
+
+<div class="cards">
+  <div class="card"><h3>Total Logs</h3><p id="totalLogs">0</p></div>
+  <div class="card"><h3>Blocked</h3><p id="blocked">0</p></div>
+  <div class="card"><h3>Allowed</h3><p id="allowed">0</p></div>
+  <div class="card"><h3>Unique IPs</h3><p id="uniqueIps">0</p></div>
+</div>
+
+<h2>📊 Live Logs</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Time</th>
+      <th>Src IP</th>
+      <th>Dst Port</th>
+      <th>Protocol</th>
+      <th>Action</th>
+      <th>Reason</th>
+    </tr>
+  </thead>
+  <tbody id="logs"></tbody>
+</table>
+
+<h2>🚫 Blocked IPs</h2>
+<table>
+  <thead>
+    <tr>
+      <th>IP</th>
+      <th>Reason</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody id="blockedIps"></tbody>
+</table>
+
+<script>
+const API = "http://127.0.0.1:8000";
+
+// ---------------- STATS ----------------
+async function loadStats() {
+  const res = await fetch(`${API}/stats`);
+  const data = await res.json();
+
+  document.getElementById("totalLogs").innerText = data.total_logs;
+  document.getElementById("blocked").innerText = data.total_blocked;
+  document.getElementById("allowed").innerText = data.total_allowed;
+  document.getElementById("uniqueIps").innerText = data.unique_source_ips;
+}
+
+// ---------------- BLOCKED IPS ----------------
+async function loadBlockedIps() {
+  const res = await fetch(`${API}/blocked_ips`);
+  const data = await res.json();
+
+  const table = document.getElementById("blockedIps");
+  table.innerHTML = "";
+
+  data.forEach(ip => {
+    table.innerHTML += `
+      <tr>
+        <td>${ip.ip}</td>
+        <td>${ip.reason || ""}</td>
+        <td>
+          <button class="unblock" onclick="unblockIp('${ip.ip}')">Unblock</button>
+        </td>
+      </tr>`;
+  });
+}
+
+async function unblockIp(ip) {
+  await fetch(`${API}/unblock/${ip}`, { method: "DELETE" });
+  loadBlockedIps();
+}
+
+// ---------------- LIVE LOGS (WebSocket) ----------------
+const ws = new WebSocket("ws://127.0.0.1:8000/ws/logs");
+
+ws.onmessage = (event) => {
+  const log = JSON.parse(event.data);
+  const table = document.getElementById("logs");
+
+  const row = `
+    <tr>
+      <td>${log.timestamp}</td>
+      <td>${log.src_ip}</td>
+      <td>${log.dst_port || ""}</td>
+      <td>${log.protocol}</td>
+      <td class="${log.action === "BLOCK" ? "block" : "allow"}">${log.action}</td>
+      <td>${log.reason}</td>
+    </tr>`;
+
+  table.innerHTML = row + table.innerHTML;
+};
+
+// Initial load
+loadStats();
+loadBlockedIps();
+setInterval(loadStats, 5000);
+</script>
+
+</body>
+</html>
