@@ -2,7 +2,7 @@ import subprocess
 from api.database import sessionLocal
 from api.models import BlockedIP
 
-def block_ip(ip: str, reason: str = "Manaual Bloack"):
+def block_ip(ip: str, reason: str = "Manual Bloack"):
     db = sessionLocal()
 
     subprocess.run(
