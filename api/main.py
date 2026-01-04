@@ -1,9 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from api.database import sessionLocal, engine
 from api import models
 from api.models import Firewall_log, BlockedIP
 from sqlalchemy import func
 from firewall.block_manager import block_ip, unblock_ip
+import asyncio
 
 app = FastAPI(title="Firewall Dashboard API")
 
@@ -82,3 +83,41 @@ def api_unblock_ip(ip: str):
         "ip" : ip,
         "action" : "unblocked",
     }
+
+@app.websocket("/ws/logs")
+async def websocket_logs(websocket : WebSocket):
+    await websocket.accept()
+
+    last_seen_id = 0
+
+    try:
+        while True:
+            db = sessionLocal()
+
+            new_logs = (
+                db.query(Firewall_log) \
+                .filter(Firewall_log.id > last_seen_id) \
+                .order_by(Firewall_log.id.asc()) \
+                .all()
+            )
+        
+            db.close()
+
+            for log in new_logs:
+                await websocket.send_json({
+                    "id": log.id,
+                    "timestamp": str(log.timestamp),
+                    "src_ip": str(log.src_ip),
+                    "dst_ip": str(log.dst_ip),
+                    "src_port": log.src_port,
+                    "dst_port": log.dst_port,
+                    "protocol": log.protocol,
+                    "action": log.action,
+                    "reason": log.reason
+                })
+                last_seen_id = log.id
+
+            await asyncio.sleep(1)
+
+    except WebSocketDisconnect:
+        print("Websocket Client Disconnected")
