@@ -8,6 +8,10 @@ from firewall.log_event import *
 from firewall.packet_info import *
 from firewall.blocked_ip import block_ip
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+whitelist_path = os.path.join(BASE_DIR, "whitelist.txt")
+blacklist_path = os.path.join(BASE_DIR, "blacklist.txt")
+
 
 THRESHOLD = 40
 GMAIL_SERVICE = gmail_authenticate()
@@ -81,8 +85,8 @@ if __name__ == "__main__":
 		sys.exit(1)
 
 	#collects the whitelisted and blacklisted ip sets
-	whitelist_ips = read_ip_file("whitelist.txt")
-	blacklist_ips = read_ip_file("blacklist.txt")
+	whitelist_ips = read_ip_file(whitelist_path)
+	blacklist_ips = read_ip_file(blacklist_path)
 
 	packet_count = defaultdict(int)
 	user_alert_info = get_information()
