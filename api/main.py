@@ -10,10 +10,11 @@ app = FastAPI(title="Firewall Dashboard API")
 
 models.Base.metadata.create_all(bind=engine)
 
+
 @app.get("/logs")
 def get_logs(limit: int = 100):
     db = sessionLocal()
-    logs = (db.query(Firewall_log).order_by(Firewall_log.id.desc()).limit(limit).all())
+    logs = db.query(Firewall_log).order_by(Firewall_log.id.desc()).limit(limit).all()
     db.close()
     return logs
 
@@ -26,18 +27,18 @@ def get_stats():
 
     total_blocked = db.query(func.count(Firewall_log.id))\
         .filter(Firewall_log.action == "BLOCK").scalar()
-    
+
     total_allowed = db.query(func.count(Firewall_log.id))\
         .filter(Firewall_log.action == "ALLOW").scalar()
-    
-    unique_source_ips = db.query(\
+
+    unique_source_ips = db.query(
         func.count(func.distinct(Firewall_log.src_ip))).scalar()
 
     top_ports = (
-        db.query(Firewall_log.dst_port, func.count(Firewall_log.dst_port).label("count"))\
-        .group_by(Firewall_log.dst_port)\
-        .order_by(func.count(Firewall_log.dst_port).desc())\
-        .limit(5)\
+        db.query(Firewall_log.dst_port, func.count(Firewall_log.dst_port).label("count"))
+        .group_by(Firewall_log.dst_port)
+        .order_by(func.count(Firewall_log.dst_port).desc())
+        .limit(5)
         .all()
     )
 
@@ -57,35 +58,34 @@ def get_stats():
 @app.get("/blocked_ips")
 def get_blocked_ips():
     db = sessionLocal()
-
     blocked = db.query(BlockedIP).order_by(BlockedIP.blocked_at.desc()).all()
     db.close()
-
     return blocked
+
 
 @app.post("/block/{ip}")
 def api_block_ip(ip: str, reason: str = "Blocked by Admin"):
-    block_ip(ip= ip, reason= reason)
-
+    block_ip(ip=ip, reason=reason)
     return {
-        "status" : "success",
-        "ip" : ip,
-        "action" : "blocked",
-        "reason" : reason
+        "status": "success",
+        "ip": ip,
+        "action": "blocked",
+        "reason": reason
     }
 
-@app.delete("unblock/{ip}")
+
+@app.delete("/unblock/{ip}")   # BUG FIX: was "unblock/{ip}" — missing leading slash
 def api_unblock_ip(ip: str):
-    unblock_ip(ip= ip)
-
+    unblock_ip(ip=ip)
     return {
-        "status" : "success",
-        "ip" : ip,
-        "action" : "unblocked",
+        "status": "success",
+        "ip": ip,
+        "action": "unblocked"
     }
+
 
 @app.websocket("/ws/logs")
-async def websocket_logs(websocket : WebSocket):
+async def websocket_logs(websocket: WebSocket):
     await websocket.accept()
 
     last_seen_id = 0
@@ -95,12 +95,12 @@ async def websocket_logs(websocket : WebSocket):
             db = sessionLocal()
 
             new_logs = (
-                db.query(Firewall_log) \
-                .filter(Firewall_log.id > last_seen_id) \
-                .order_by(Firewall_log.id.asc()) \
+                db.query(Firewall_log)
+                .filter(Firewall_log.id > last_seen_id)
+                .order_by(Firewall_log.id.asc())
                 .all()
             )
-        
+
             db.close()
 
             for log in new_logs:
@@ -120,4 +120,4 @@ async def websocket_logs(websocket : WebSocket):
             await asyncio.sleep(1)
 
     except WebSocketDisconnect:
-        print("Websocket Client Disconnected")
+        print("WebSocket client disconnected")

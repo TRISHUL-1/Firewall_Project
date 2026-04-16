@@ -1,92 +1,137 @@
-import os
+import subprocess
 import time
 import sys
+import os
 from collections import defaultdict
-from scapy.all import sniff,IP,TCP
-from firewall.send_mail import *
-from firewall.log_event import *
-from firewall.packet_info import *
-from firewall.blocked_ip import block_ip
+from scapy.all import sniff, IP, TCP
+from firewall.send_mail import gmail_authenticate, send_email, get_information
+from firewall.log_event import log_event
+from firewall.packet_info import get_info
+from firewall.block_manager import block_ip
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+whitelist_path = os.path.join(BASE_DIR, "whitelist.txt")
+blacklist_path = os.path.join(BASE_DIR, "blacklist.txt")
 
 THRESHOLD = 40
-GMAIL_SERVICE = gmail_authenticate()
-print(f"Threshold: {THRESHOLD}")
+
 
 def read_ip_file(filename):
-	""" It reads a file containing list of ips and returns a set of ips """
-	with open(filename, "r") as file:
-		ips = [line.strip() for line in file]
-		return set(ips)
+    """Reads a file containing a list of IPs and returns a set."""
+    with open(filename, "r") as file:
+        return set(line.strip() for line in file if line.strip())
+
+
+def drop_ip(ip: str):
+    """Drops an IP via iptables safely — no shell, no injection risk."""
+    subprocess.run(
+        ["iptables", "-A", "INPUT", "-s", ip, "-j", "DROP"],
+        check=False
+    )
+
 
 def is_nimda_worm(packet):
-	""" checks if the packet contains traces of the nimda worm """
-	if packet.haslayer(TCP) and packet[TCP].dport == 80:
-		payload = packet[TCP].payload
-		return "GET /scripts/root.exe" in str(payload)
-	return False
+    """Checks if the packet contains traces of the Nimda worm."""
+    if packet.haslayer(TCP) and packet[TCP].dport == 80:
+        payload = packet[TCP].payload
+        return "GET /scripts/root.exe" in str(payload)
+    return False
 
-def packet_callback(packet):
-	""" It breakesdown and analyzes the packet send to detect threats and blacklist ips """
-	
-	packet_info = get_info(packet)
 
-	if packet_info["src_ip"] in whitelist_ips:
-		log_event(packet_info=packet_info, action="NONE" ,message=f"Allowed ip: {packet_info["src_ip"]}")
-		return
+def make_packet_callback(whitelist_ips, blacklist_ips, packet_count,
+                         start_time, user_alert_info, gmail_service, alerted_ips):
+    """
+    Returns a packet callback closed over all shared state.
+    alerted_ips: set of IPs already emailed this session — prevents alert spam.
+    """
+    def packet_callback(packet):
+        packet_info = get_info(packet)
+        src_ip = packet_info["src_ip"]
 
-	if packet_info["src_ip"] in blacklist_ips:
-		os.system(f"iptables -A INPUT -s {packet_info["src_ip"]} -j DROP")
-		log_event(packet_info=packet_info, action="BLOCK" ,message=f"Blocking Blacklisted ip: {packet_info["src_ip"]}")
-		return
+        if src_ip is None:
+            return
 
-	if is_nimda_worm(packet):
-		print(f"Blocking nimda worm: {packet_info["src_ip"]}")
-		os.system(f"iptables -A INPUT -s {packet_info["src_ip"]} -j DROP")
-		log_event(packet_info=packet_info, action="BLOCK" ,message=f"Blocking Nimda source ip: {packet_info["src_ip"]}")
-		block_ip(ip=packet_info["src_ip"], reason="Nimda Worm Detected")
+        # Whitelisted — log and allow
+        if src_ip in whitelist_ips:
+            log_event(packet_info=packet_info, action="NONE",
+                      message=f"Allowed ip: {src_ip}")
+            return
 
-		send_email(GMAIL_SERVICE, 
-			user_alert_info["to"],
-			user_alert_info["subject"], 
-			user_alert_info["message_text"])
+        # Already blacklisted — enforce iptables rule and log
+        if src_ip in blacklist_ips:
+            drop_ip(src_ip)
+            log_event(packet_info=packet_info, action="BLOCK",
+                      message=f"Blocking blacklisted ip: {src_ip}")
+            return
 
-		return
+        # Nimda worm detection
+        if is_nimda_worm(packet):
+            print(f"Blocking Nimda worm from: {src_ip}")
+            drop_ip(src_ip)
+            log_event(packet_info=packet_info, action="BLOCK",
+                      message=f"Blocking Nimda source ip: {src_ip}")
+            block_ip(ip=src_ip, reason="Nimda Worm Detected")
+            blacklist_ips.add(src_ip)
 
-	packet_count[packet_info["src_ip"]] += 1
-	current_time = time.time()
-	time_interval = current_time - start_time[0]
+            if src_ip not in alerted_ips:
+                send_email(gmail_service,
+                           user_alert_info["to"],
+                           user_alert_info["subject"],
+                           user_alert_info["message_text"])
+                alerted_ips.add(src_ip)
+            return
 
-	if time_interval >= 1:
-		for ip, count in packet_count.items():
-			packet_rate = count / time_interval
-			if packet_rate > THRESHOLD and ip not in blacklist_ips:
-				
-				send_email(GMAIL_SERVICE, 
-							user_alert_info["to"],
-							user_alert_info["subject"], 
-							user_alert_info["message_text"])
-				
-				print(f"Blocking ip: {packet_info["src_ip"]}, packet_rate: {packet_rate}")
-				os.system(f"iptables -A INPUT -s {packet_info["src_ip"]} -j DROP")
-				log_event(packet_info=packet_info, action="BLOCK", message=f"Blocking source ip: {packet_info["src_ip"]}, packet_rate: {packet_rate}")
-				block_ip(ip=packet_info["src_ip"], reason="High Packet Rate Detected")
-				blacklist_ips.add(ip)
-		packet_count.clear()
-		start_time[0] = current_time
+        # Rate-limit tracking
+        packet_count[src_ip] += 1
+        current_time = time.time()
+        time_interval = current_time - start_time[0]
+
+        if time_interval >= 1:
+            for ip, count in packet_count.items():
+                packet_rate = count / time_interval
+                if packet_rate > THRESHOLD and ip not in blacklist_ips:
+                    print(f"Blocking ip: {ip}, packet_rate: {packet_rate:.1f}")
+                    drop_ip(ip)
+                    log_event(packet_info=packet_info, action="BLOCK",
+                              message=f"Blocking source ip: {ip}, packet_rate: {packet_rate:.2f}")
+                    block_ip(ip=ip, reason="High Packet Rate Detected")
+                    blacklist_ips.add(ip)
+
+                    if ip not in alerted_ips:
+                        send_email(gmail_service,
+                                   user_alert_info["to"],
+                                   user_alert_info["subject"],
+                                   user_alert_info["message_text"])
+                        alerted_ips.add(ip)
+
+            packet_count.clear()
+            start_time[0] = current_time
+
+    return packet_callback
+
 
 if __name__ == "__main__":
-	if os.geteuid() != 0:
-		print("This script requires root privileges")
-		sys.exit(1)
+    if os.geteuid() != 0:
+        print("This script requires root privileges.")
+        sys.exit(1)
 
-	#collects the whitelisted and blacklisted ip sets
-	whitelist_ips = read_ip_file("whitelist.txt")
-	blacklist_ips = read_ip_file("blacklist.txt")
+    print(f"Threshold: {THRESHOLD} packets/sec")
 
-	packet_count = defaultdict(int)
-	user_alert_info = get_information()
-	start_time = [time.time()]
+    whitelist_ips = read_ip_file(whitelist_path)
+    blacklist_ips = read_ip_file(blacklist_path)
 
-	print("Monitoring Network Traffic...")
-	sniff(filter="ip", prn=packet_callback)
+    packet_count = defaultdict(int)
+    start_time = [time.time()]
+    alerted_ips = set()
+
+    # Gmail auth only runs here at startup — not at import time
+    gmail_service = gmail_authenticate()
+    user_alert_info = get_information()
+
+    callback = make_packet_callback(
+        whitelist_ips, blacklist_ips, packet_count,
+        start_time, user_alert_info, gmail_service, alerted_ips
+    )
+
+    print("Monitoring Network Traffic...")
+    sniff(filter="ip", prn=callback)
