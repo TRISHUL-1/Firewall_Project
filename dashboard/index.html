@@ -4,165 +4,601 @@
   <meta charset="UTF-8">
   <title>Firewall Dashboard</title>
   <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
       font-family: Arial, sans-serif;
       background: #0f172a;
-      color: #e5e7eb;
-      margin: 0;
-      padding: 20px;
+      color: #e2e8f0;
+      padding: 24px;
+      min-height: 100vh;
     }
-    h1 { color: #38bdf8; }
 
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+
+    header h1 { color: #38bdf8; font-size: 1.6rem; }
+
+    #ws-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.8rem;
+      color: #94a3b8;
+    }
+
+    #ws-dot {
+      width: 9px; height: 9px;
+      border-radius: 50%;
+      background: #ef4444;
+      transition: background 0.4s;
+    }
+
+    #ws-dot.connected { background: #22c55e; }
+
+    /* ---- STAT CARDS ---- */
     .cards {
       display: grid;
       grid-template-columns: repeat(4, 1fr);
-      gap: 15px;
-      margin-bottom: 20px;
+      gap: 14px;
+      margin-bottom: 24px;
     }
 
     .card {
-      background: #020617;
-      padding: 15px;
-      border-radius: 8px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 18px 14px;
       text-align: center;
     }
 
+    .card .label {
+      font-size: 0.75rem;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+    }
+
+    .card .value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #f1f5f9;
+    }
+
+    .card.danger  .value { color: #f87171; }
+    .card.success .value { color: #4ade80; }
+    .card.info    .value { color: #38bdf8; }
+    .card.warn    .value { color: #fb923c; }
+
+    /* ---- SECTION LAYOUT ---- */
+    .section-title {
+      font-size: 1rem;
+      font-weight: 600;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 12px;
+      margin-top: 28px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 8px;
+    }
+
+    .panel {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    /* ---- TABLES ---- */
     table {
       width: 100%;
       border-collapse: collapse;
-      margin-top: 10px;
-      background: #020617;
-    }
-
-    th, td {
-      padding: 8px;
-      border-bottom: 1px solid #1e293b;
-      text-align: center;
     }
 
     th {
-      background: #020617;
+      background: #0f172a;
       color: #38bdf8;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 10px 12px;
+      text-align: left;
     }
 
-    .block { color: #ef4444; font-weight: bold; }
-    .allow { color: #22c55e; }
+    td {
+      padding: 9px 12px;
+      font-size: 0.85rem;
+      border-bottom: 1px solid #1e293b;
+      color: #cbd5e1;
+      word-break: break-all;
+    }
 
-    button {
-      background: #ef4444;
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: #263248; }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+
+    .badge.block  { background: #450a0a; color: #f87171; }
+    .badge.allow  { background: #052e16; color: #4ade80; }
+    .badge.none   { background: #1e293b; color: #94a3b8; }
+
+    .empty-row td {
+      text-align: center;
+      color: #475569;
+      padding: 24px;
+      font-style: italic;
+    }
+
+    /* ---- BLOCK FORM ---- */
+    .block-form {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+
+    .block-form label {
+      font-size: 0.85rem;
+      color: #94a3b8;
+      white-space: nowrap;
+    }
+
+    .block-form input[type="text"] {
+      flex: 1;
+      min-width: 160px;
+      background: #0f172a;
+      border: 1px solid #475569;
+      border-radius: 6px;
+      color: #e2e8f0;
+      padding: 7px 12px;
+      font-size: 0.875rem;
+      outline: none;
+    }
+
+    .block-form input[type="text"]:focus {
+      border-color: #38bdf8;
+    }
+
+    .block-form input[type="text"]::placeholder { color: #475569; }
+
+    .btn {
       border: none;
-      color: white;
-      padding: 5px 10px;
-      border-radius: 5px;
+      border-radius: 6px;
+      padding: 7px 16px;
+      font-size: 0.875rem;
+      font-weight: 600;
       cursor: pointer;
+      transition: opacity 0.15s;
     }
 
-    button.unblock {
-      background: #22c55e;
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-danger  { background: #ef4444; color: #fff; }
+    .btn-success { background: #22c55e; color: #fff; }
+
+    .toast {
+      position: fixed;
+      bottom: 24px; right: 24px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 10px 18px;
+      font-size: 0.85rem;
+      color: #e2e8f0;
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+      z-index: 999;
+    }
+
+    .toast.show { opacity: 1; }
+
+    /* ---- PORT BAR CHART ---- */
+    .port-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 14px;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    .port-row:last-child { border-bottom: none; }
+
+    .port-label {
+      font-size: 0.8rem;
+      color: #94a3b8;
+      min-width: 52px;
+      font-family: monospace;
+    }
+
+    .port-bar-wrap {
+      flex: 1;
+      background: #0f172a;
+      border-radius: 4px;
+      height: 10px;
+      overflow: hidden;
+    }
+
+    .port-bar {
+      height: 100%;
+      background: #38bdf8;
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+
+    .port-count {
+      font-size: 0.78rem;
+      color: #64748b;
+      min-width: 36px;
+      text-align: right;
+    }
+
+    /* ---- PROTOCOL BREAKDOWN ---- */
+    .proto-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0;
+    }
+
+    .proto-cell {
+      text-align: center;
+      padding: 18px 10px;
+      border-right: 1px solid #1e293b;
+    }
+
+    .proto-cell:last-child { border-right: none; }
+
+    .proto-name {
+      font-size: 0.7rem;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 6px;
+    }
+
+    .proto-count {
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+    .proto-count.tcp  { color: #38bdf8; }
+    .proto-count.udp  { color: #a78bfa; }
+    .proto-count.icmp { color: #fb923c; }
+
+    @media (max-width: 700px) {
+      .cards { grid-template-columns: repeat(2, 1fr); }
+      .grid-2 { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
 
-<h1>🔥 Firewall Dashboard</h1>
+<header>
+  <h1>🔥 Firewall Dashboard</h1>
+  <div id="ws-status">
+    <div id="ws-dot"></div>
+    <span id="ws-label">Connecting…</span>
+  </div>
+</header>
 
+<!-- STAT CARDS -->
 <div class="cards">
-  <div class="card"><h3>Total Logs</h3><p id="totalLogs">0</p></div>
-  <div class="card"><h3>Blocked</h3><p id="blocked">0</p></div>
-  <div class="card"><h3>Allowed</h3><p id="allowed">0</p></div>
-  <div class="card"><h3>Unique IPs</h3><p id="uniqueIps">0</p></div>
+  <div class="card danger">
+    <div class="label">Total Logs</div>
+    <div class="value" id="totalLogs">—</div>
+  </div>
+  <div class="card danger">
+    <div class="label">Blocked</div>
+    <div class="value" id="blocked">—</div>
+  </div>
+  <div class="card success">
+    <div class="label">Allowed</div>
+    <div class="value" id="allowed">—</div>
+  </div>
+  <div class="card info">
+    <div class="label">Unique IPs</div>
+    <div class="value" id="uniqueIps">—</div>
+  </div>
 </div>
 
-<h2>📊 Live Logs</h2>
-<table>
-  <thead>
-    <tr>
-      <th>Time</th>
-      <th>Src IP</th>
-      <th>Dst Port</th>
-      <th>Protocol</th>
-      <th>Action</th>
-      <th>Reason</th>
-    </tr>
-  </thead>
-  <tbody id="logs"></tbody>
-</table>
+<!-- TOP PORTS + PROTOCOL BREAKDOWN -->
+<div class="grid-2">
+  <div>
+    <div class="section-title">🎯 Top Targeted Ports</div>
+    <div class="panel" id="topPortsPanel">
+      <div class="port-row"><span style="color:#475569;font-size:0.82rem;font-style:italic">Loading…</span></div>
+    </div>
+  </div>
+  <div>
+    <div class="section-title">📡 Protocol Breakdown</div>
+    <div class="panel">
+      <div class="proto-grid">
+        <div class="proto-cell">
+          <div class="proto-name">TCP</div>
+          <div class="proto-count tcp" id="protoTcp">—</div>
+        </div>
+        <div class="proto-cell">
+          <div class="proto-name">UDP</div>
+          <div class="proto-count udp" id="protoUdp">—</div>
+        </div>
+        <div class="proto-cell">
+          <div class="proto-name">ICMP</div>
+          <div class="proto-count icmp" id="protoIcmp">—</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
-<h2>🚫 Blocked IPs</h2>
-<table>
-  <thead>
-    <tr>
-      <th>IP</th>
-      <th>Reason</th>
-      <th>Action</th>
-    </tr>
-  </thead>
-  <tbody id="blockedIps"></tbody>
-</table>
+<!-- MANUAL BLOCK FORM -->
+<div class="section-title">🔒 Block an IP</div>
+<div class="block-form">
+  <label for="blockIpInput">IP Address</label>
+  <input type="text" id="blockIpInput" placeholder="e.g. 192.168.1.100" maxlength="45">
+  <input type="text" id="blockReasonInput" placeholder="Reason (optional)" maxlength="120" style="flex:2">
+  <button class="btn btn-danger" onclick="manualBlockIp()">Block</button>
+</div>
+
+<!-- BLOCKED IPs TABLE -->
+<div class="section-title">🚫 Blocked IPs</div>
+<div class="panel">
+  <table>
+    <thead>
+      <tr>
+        <th>IP Address</th>
+        <th>Blocked At</th>
+        <th>Reason</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="blockedIps"></tbody>
+  </table>
+</div>
+
+<!-- LIVE LOGS TABLE -->
+<div class="section-title">📊 Live Logs <span style="font-size:0.75rem;color:#475569;font-weight:400;text-transform:none">(last 100)</span></div>
+<div class="panel">
+  <table>
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Src IP</th>
+        <th>Dst IP</th>
+        <th>Port</th>
+        <th>Protocol</th>
+        <th>Action</th>
+        <th>Reason</th>
+      </tr>
+    </thead>
+    <tbody id="logs"></tbody>
+  </table>
+</div>
+
+<div class="toast" id="toast"></div>
 
 <script>
 const API = "http://127.0.0.1:8000";
+const LOG_LIMIT = 100;
 
-// ---------------- STATS ----------------
+// Track protocol counts locally from WebSocket stream
+const protoCounts = { TCP: 0, UDP: 0, ICMP: 0 };
+
+// ---- TOAST ----
+function showToast(msg, duration = 2500) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), duration);
+}
+
+// ---- STATS ----
 async function loadStats() {
-  const res = await fetch(`${API}/stats`);
-  const data = await res.json();
-
-  document.getElementById("totalLogs").innerText = data.total_logs;
-  document.getElementById("blocked").innerText = data.total_blocked;
-  document.getElementById("allowed").innerText = data.total_allowed;
-  document.getElementById("uniqueIps").innerText = data.unique_source_ips;
+  try {
+    const res = await fetch(`${API}/stats`);
+    const data = await res.json();
+    document.getElementById("totalLogs").textContent  = data.total_logs.toLocaleString();
+    document.getElementById("blocked").textContent    = data.total_blocked.toLocaleString();
+    document.getElementById("allowed").textContent    = data.total_allowed.toLocaleString();
+    document.getElementById("uniqueIps").textContent  = data.unique_source_ips.toLocaleString();
+    renderTopPorts(data.top_targeted_ports || []);
+  } catch (e) {
+    console.error("Stats fetch failed:", e);
+  }
 }
 
-// ---------------- BLOCKED IPS ----------------
+// ---- TOP PORTS ----
+function renderTopPorts(ports) {
+  const panel = document.getElementById("topPortsPanel");
+  if (!ports.length) {
+    panel.innerHTML = '<div class="port-row"><span style="color:#475569;font-style:italic;font-size:0.82rem">No data yet</span></div>';
+    return;
+  }
+  const max = ports[0].count;
+  panel.innerHTML = ports.map(p => `
+    <div class="port-row">
+      <span class="port-label">:${p.port ?? "—"}</span>
+      <div class="port-bar-wrap">
+        <div class="port-bar" style="width:${Math.round((p.count / max) * 100)}%"></div>
+      </div>
+      <span class="port-count">${p.count.toLocaleString()}</span>
+    </div>`).join("");
+}
+
+// ---- PROTOCOL BREAKDOWN ----
+function updateProtoCounts() {
+  document.getElementById("protoTcp").textContent  = protoCounts.TCP.toLocaleString();
+  document.getElementById("protoUdp").textContent  = protoCounts.UDP.toLocaleString();
+  document.getElementById("protoIcmp").textContent = protoCounts.ICMP.toLocaleString();
+}
+
+// ---- BLOCKED IPs ----
 async function loadBlockedIps() {
-  const res = await fetch(`${API}/blocked_ips`);
-  const data = await res.json();
-
-  const table = document.getElementById("blockedIps");
-  table.innerHTML = "";
-
-  data.forEach(ip => {
-    table.innerHTML += `
+  try {
+    const res = await fetch(`${API}/blocked_ips`);
+    const data = await res.json();
+    const tbody = document.getElementById("blockedIps");
+    if (!data.length) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No blocked IPs</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(entry => `
       <tr>
-        <td>${ip.ip}</td>
-        <td>${ip.reason || ""}</td>
+        <td><code style="color:#f87171">${entry.ip}</code></td>
+        <td>${entry.blocked_at ? new Date(entry.blocked_at).toLocaleString() : "—"}</td>
+        <td>${entry.reason || "—"}</td>
         <td>
-          <button class="unblock" onclick="unblockIp('${ip.ip}')">Unblock</button>
+          <button class="btn btn-success" onclick="unblockIp('${entry.ip}', this)">Unblock</button>
         </td>
-      </tr>`;
-  });
+      </tr>`).join("");
+  } catch (e) {
+    console.error("Blocked IPs fetch failed:", e);
+  }
 }
 
-async function unblockIp(ip) {
-  await fetch(`${API}/unblock/${ip}`, { method: "DELETE" });
-  loadBlockedIps();
+async function unblockIp(ip, btn) {
+  btn.disabled = true;
+  btn.textContent = "…";
+  try {
+    await fetch(`${API}/unblock/${encodeURIComponent(ip)}`, { method: "DELETE" });
+    showToast(`✅ Unblocked ${ip}`);
+    loadBlockedIps();
+    loadStats();
+  } catch (e) {
+    showToast("❌ Unblock failed");
+    btn.disabled = false;
+    btn.textContent = "Unblock";
+  }
 }
 
-// ---------------- LIVE LOGS (WebSocket) ----------------
-const ws = new WebSocket("ws://127.0.0.1:8000/ws/logs");
+// ---- MANUAL BLOCK ----
+async function manualBlockIp() {
+  const ipInput     = document.getElementById("blockIpInput");
+  const reasonInput = document.getElementById("blockReasonInput");
+  const ip     = ipInput.value.trim();
+  const reason = reasonInput.value.trim() || "Blocked by Admin";
 
-ws.onmessage = (event) => {
-  const log = JSON.parse(event.data);
-  const table = document.getElementById("logs");
+  if (!ip) { showToast("⚠️ Enter an IP address"); return; }
 
-  const row = `
-    <tr>
-      <td>${log.timestamp}</td>
-      <td>${log.src_ip}</td>
-      <td>${log.dst_port || ""}</td>
-      <td>${log.protocol}</td>
-      <td class="${log.action === "BLOCK" ? "block" : "allow"}">${log.action}</td>
-      <td>${log.reason}</td>
-    </tr>`;
+  const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$|^([0-9a-fA-F:]+)$/;
+  if (!ipRegex.test(ip)) { showToast("⚠️ Invalid IP format"); return; }
 
-  table.innerHTML = row + table.innerHTML;
-};
+  try {
+    const res = await fetch(`${API}/block/${encodeURIComponent(ip)}?reason=${encodeURIComponent(reason)}`, {
+      method: "POST"
+    });
+    if (res.ok) {
+      showToast(`🚫 Blocked ${ip}`);
+      ipInput.value = "";
+      reasonInput.value = "";
+      loadBlockedIps();
+      loadStats();
+    } else {
+      showToast("❌ Block request failed");
+    }
+  } catch (e) {
+    showToast("❌ Could not reach API");
+  }
+}
 
-// Initial load
+// Allow Enter key to submit block form
+document.getElementById("blockReasonInput").addEventListener("keydown", e => {
+  if (e.key === "Enter") manualBlockIp();
+});
+document.getElementById("blockIpInput").addEventListener("keydown", e => {
+  if (e.key === "Enter") manualBlockIp();
+});
+
+// ---- LIVE LOGS via WebSocket ----
+function addLogRow(log) {
+  const tbody = document.getElementById("logs");
+  const action = (log.action || "").toUpperCase();
+  const badgeClass = action === "BLOCK" ? "block" : action === "ALLOW" ? "allow" : "none";
+
+  // Track protocol
+  const proto = (log.protocol || "").toUpperCase();
+  if (proto in protoCounts) {
+    protoCounts[proto]++;
+    updateProtoCounts();
+  }
+
+  const row = document.createElement("tr");
+  row.innerHTML = `
+    <td>${log.timestamp}</td>
+    <td><code>${log.src_ip}</code></td>
+    <td><code>${log.dst_ip || "—"}</code></td>
+    <td>${log.dst_port || "—"}</td>
+    <td>${log.protocol}</td>
+    <td><span class="badge ${badgeClass}">${action}</span></td>
+    <td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${log.reason}">${log.reason}</td>
+  `;
+
+  tbody.insertBefore(row, tbody.firstChild);
+
+  // Enforce row limit
+  while (tbody.rows.length > LOG_LIMIT) {
+    tbody.deleteRow(tbody.rows.length - 1);
+  }
+}
+
+function connectWebSocket() {
+  const ws = new WebSocket("ws://127.0.0.1:8000/ws/logs");
+  const dot   = document.getElementById("ws-dot");
+  const label = document.getElementById("ws-label");
+
+  ws.onopen = () => {
+    dot.classList.add("connected");
+    label.textContent = "Live";
+  };
+
+  ws.onmessage = (event) => {
+    const log = JSON.parse(event.data);
+    addLogRow(log);
+  };
+
+  ws.onclose = () => {
+    dot.classList.remove("connected");
+    label.textContent = "Reconnecting…";
+    setTimeout(connectWebSocket, 3000);  // auto-reconnect
+  };
+
+  ws.onerror = () => ws.close();
+}
+
+// ---- INIT ----
 loadStats();
 loadBlockedIps();
-setInterval(loadStats, 5000);
+connectWebSocket();
+
+// Refresh stats + blocked IPs every 10s
+setInterval(() => {
+  loadStats();
+  loadBlockedIps();
+}, 10000);
 </script>
 
 </body>
