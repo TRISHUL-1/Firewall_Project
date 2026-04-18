@@ -2,6 +2,7 @@ import subprocess
 import time
 import sys
 import os
+import threading
 from collections import defaultdict
 from scapy.all import sniff, IP, TCP
 from firewall.send_mail import gmail_authenticate, send_email, get_information
@@ -14,6 +15,7 @@ whitelist_path = os.path.join(BASE_DIR, "whitelist.txt")
 blacklist_path = os.path.join(BASE_DIR, "blacklist.txt")
 
 THRESHOLD = 40
+BLACKLIST_SYNC_INTERVAL = 15  # seconds between DB blacklist polls
 
 
 def read_ip_file(filename):
@@ -38,11 +40,51 @@ def is_nimda_worm(packet):
     return False
 
 
+def sync_blacklist_from_db(blacklist_ips: set):
+    """
+    Polls the DB for blocked IPs and merges any new ones into the
+    in-memory blacklist_ips set. Runs in a background thread.
+
+    This closes the gap where an IP blocked via the API (dashboard or
+    REST call) would not be known to the running firewall until restart.
+    """
+    try:
+        from api.database import sessionLocal
+        from api.models import BlockedIP
+
+        db = sessionLocal()
+        db_ips = {row.ip for row in db.query(BlockedIP.ip).all()}
+        db.close()
+
+        new_ips = db_ips - blacklist_ips
+        if new_ips:
+            print(f"[blacklist sync] Adding {len(new_ips)} new IP(s) from DB: {new_ips}")
+            blacklist_ips.update(new_ips)
+            # Ensure iptables rules exist for any newly synced IPs
+            for ip in new_ips:
+                drop_ip(ip)
+    except Exception as e:
+        print(f"[blacklist sync] DB poll failed: {e}")
+
+
+def start_blacklist_sync(blacklist_ips: set, interval: int):
+    """Launches a daemon thread that syncs the blacklist from DB every `interval` seconds."""
+    def loop():
+        while True:
+            time.sleep(interval)
+            sync_blacklist_from_db(blacklist_ips)
+
+    t = threading.Thread(target=loop, daemon=True, name="blacklist-sync")
+    t.start()
+    print(f"[blacklist sync] Started — polling DB every {interval}s")
+
+
 def make_packet_callback(whitelist_ips, blacklist_ips, packet_count,
                          start_time, user_alert_info, gmail_service, alerted_ips):
     """
     Returns a packet callback closed over all shared state.
     alerted_ips: set of IPs already emailed this session — prevents alert spam.
+    blacklist_ips: shared set, updated live by the sync thread.
     """
     def packet_callback(packet):
         packet_info = get_info(packet)
@@ -120,6 +162,10 @@ if __name__ == "__main__":
     whitelist_ips = read_ip_file(whitelist_path)
     blacklist_ips = read_ip_file(blacklist_path)
 
+    # Do an immediate DB sync on startup so any IPs blocked while the
+    # firewall was offline are picked up right away
+    sync_blacklist_from_db(blacklist_ips)
+
     packet_count = defaultdict(int)
     start_time = [time.time()]
     alerted_ips = set()
@@ -127,6 +173,9 @@ if __name__ == "__main__":
     # Gmail auth only runs here at startup — not at import time
     gmail_service = gmail_authenticate()
     user_alert_info = get_information()
+
+    # Start background thread to keep blacklist in sync with DB
+    start_blacklist_sync(blacklist_ips, BLACKLIST_SYNC_INTERVAL)
 
     callback = make_packet_callback(
         whitelist_ips, blacklist_ips, packet_count,
