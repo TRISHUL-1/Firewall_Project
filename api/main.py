@@ -1,4 +1,5 @@
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from api.database import sessionLocal, engine
 from api import models
 from api.models import Firewall_log, BlockedIP
@@ -7,6 +8,15 @@ from firewall.block_manager import block_ip, unblock_ip
 import asyncio
 
 app = FastAPI(title="Firewall Dashboard API")
+
+# Allow the dashboard to be opened as a local file (file://) or from any
+# local origin — without this, browsers block all fetch/WebSocket calls.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -74,7 +84,7 @@ def api_block_ip(ip: str, reason: str = "Blocked by Admin"):
     }
 
 
-@app.delete("/unblock/{ip}")   # BUG FIX: was "unblock/{ip}" — missing leading slash
+@app.delete("/unblock/{ip}")
 def api_unblock_ip(ip: str):
     unblock_ip(ip=ip)
     return {
