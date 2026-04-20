@@ -1,0 +1,55 @@
+version: "3.9"
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB:       firewall_db
+      POSTGRES_USER:     firewall_user
+      POSTGRES_PASSWORD: firewall_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U firewall_user -d firewall_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── FastAPI (dashboard API) ─────────────────────────────────────────────────
+  api:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://firewall_user:firewall_pass@db:5432/firewall_db
+    volumes:
+      - ./logs:/app/logs
+      - ./credentials:/app/credentials
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # ── Firewall (packet sniffer) ───────────────────────────────────────────────
+  # Must run as privileged to access raw sockets and iptables.
+  # Uses host networking so Scapy sees real interface traffic.
+  firewall:
+    build: .
+    restart: unless-stopped
+    command: ["python", "-m", "firewall.basic_firewall"]
+    network_mode: host        # raw packet capture needs the real network stack
+    privileged: true          # required for iptables and Scapy raw sockets
+    environment:
+      DATABASE_URL: postgresql://firewall_user:firewall_pass@localhost:5432/firewall_db
+    volumes:
+      - ./logs:/app/logs
+      - ./credentials:/app/credentials
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
